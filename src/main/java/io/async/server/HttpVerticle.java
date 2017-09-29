@@ -8,6 +8,8 @@ import io.vertx.core.Vertx;
 import io.vertx.ext.jdbc.JDBCClient;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
+import io.vertx.ext.web.client.WebClient;
+import io.vertx.ext.web.client.WebClientOptions;
 import io.vertx.ext.web.handler.BodyHandler;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -19,16 +21,19 @@ public class HttpVerticle extends AbstractVerticle
 	private static final Logger log = LogManager.getLogger(HttpVerticle.class);
 
 	private JDBCClient jdbcClient;
+	private WebClient webClient;
 	private Router router;
 
 	final DataSource dataSource;
 	final int httpPort;
+	final WikiQueriesHandler queriesHandler;
 
-	public HttpVerticle(int httpPort, DataSource dataSource)
+	public HttpVerticle(int httpPort, DataSource dataSource, WikiQueriesHandler queriesHandler)
 	{
 		super();
 		this.dataSource = dataSource;
 		this.httpPort = httpPort;
+		this.queriesHandler = queriesHandler;
 	}
 
 	@Override
@@ -36,6 +41,7 @@ public class HttpVerticle extends AbstractVerticle
 	{
 		log.info("starting http verticle");
 		jdbcClient = JDBCClient.create(vertx, dataSource);
+		webClient = WebClient.create(vertx, new WebClientOptions().setFollowRedirects(true));
 		router = Router.router(vertx);
 		initRoutes(router);
 
@@ -59,12 +65,18 @@ public class HttpVerticle extends AbstractVerticle
 	private void initRoutes(Router router)
 	{
 		router.route("/*").handler(BodyHandler.create());
-		router.get("/hello").handler(HttpVerticle::helloBodyHandler);
+		router.get("/wikiTitle").handler(this::pageQueryHandler);
+		router.get("/wikiPage/:title").handler(this::pageFetchHandler);
 	}
 
-	private static void helloBodyHandler(RoutingContext rctx)
+	private void pageQueryHandler(RoutingContext rctx)
 	{
-		rctx.response().end("hello world");
+		queriesHandler.handleQuery(rctx, jdbcClient);
+	}
+
+	private void pageFetchHandler(RoutingContext rctx)
+	{
+		queriesHandler.handleFetch(rctx, webClient);
 	}
 
 	public static void main(String[] args)
@@ -88,7 +100,7 @@ public class HttpVerticle extends AbstractVerticle
 		hikariConfig.setConnectionTimeout(20000);
 		final HikariDataSource dataSource = new HikariDataSource(hikariConfig);
 		log.info("initialized dataSource");
-		final HttpVerticle httpVerticle = new HttpVerticle(HTTP_PORT, dataSource);
+		final HttpVerticle httpVerticle = new HttpVerticle(HTTP_PORT, dataSource, new WikiQueriesHandler());
 		Vertx.vertx().deployVerticle(httpVerticle);
 		log.info("http verticle is up and running");
 	}
