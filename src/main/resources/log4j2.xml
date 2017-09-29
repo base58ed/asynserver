@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="ERROR" name="async-server.log">
+	<Properties>
+		<Property name="LOG_DIR">/opt/tomcat/logs</Property>
+		<Property name="ARCHIVE">./logArchive</Property>
+		<Property name="PATTERN">%-5level %d [%t] %c:%M(%L): %m%n</Property>
+	</Properties>
+	<Appenders>
+		<Console name="STDOUT" target="SYSTEM_OUT">
+			<PatternLayout pattern="${PATTERN}"/>
+		</Console>
+
+		<RollingFile name="fileWriter"
+								 fileName="${LOG_DIR}/async-server.log"
+								 filePattern="${ARCHIVE}/async-server.%d{yyyy-MM-dd-hh-mm}.gz">
+			<PatternLayout pattern="${PATTERN}"/>
+			<SizeBasedTriggeringPolicy size="5 MB"/>
+		</RollingFile>
+	</Appenders>
+	<Loggers>
+		<Root level="INFO">
+			<AppenderRef ref="fileWriter"/>
+			<AppenderRef ref="STDOUT"/>
+		</Root>
+
+		<Logger name="io.vertx" level="INFO" additivity="true"/>
+		<Logger name="net.intigral.ipm" level="DEBUG" additivity="true"/>
+	</Loggers>
+</Configuration>
