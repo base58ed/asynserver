@@ -33,4 +33,9 @@ public class QueryResult
 	{
 		return error;
 	}
+
+	public static QueryResult withError(String code, String description)
+	{
+		return new QueryResult(new ErrorResponse(code, description));
+	}
 }

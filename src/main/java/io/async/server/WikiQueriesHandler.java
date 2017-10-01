@@ -24,6 +24,7 @@ public class WikiQueriesHandler
 	private static final Logger log = LogManager.getLogger(WikiQueriesHandler.class);
 
 	private static final ObjectMapper mapper = new ObjectMapper();
+	private static final String QUERY_TITLE = "select page_title as pageTitle from TITLES t where  MATCH(t.page_title) AGAINST(?);";
 
 	public void handleQuery(RoutingContext rctx, JDBCClient jdbcClient)
 	{
@@ -34,6 +35,7 @@ public class WikiQueriesHandler
 				log.info("acquired sql connection in vertx async jdbcClient");
 				try (SQLConnection sqlConnection = asyncResult.result())
 				{
+					log.info("querying database for wikipedia titles matching name: {}", titleName);
 					sqlConnection.queryWithParams(QUERY_TITLE, new JsonArray().add("%" + titleName + "%"), asyncDataSetHandler -> {
 						if (asyncDataSetHandler.succeeded())
 						{
@@ -42,34 +44,27 @@ public class WikiQueriesHandler
 								.stream()
 								.map(entries -> entries.getString("pageTitle")).collect(Collectors.toList());
 							log.info("found {} titles in database matching name {}", Unbox.box(pageTitlesInDb.size()), titleName);
-							try
-							{
-								rctx.response()
-									.putHeader("Content-Type", "application/json; charset=utf-8")
-									.end(mapper.writeValueAsString(new QueryResult(pageTitlesInDb)));
-							}
-							catch (JsonProcessingException e)
-							{
-								rctx.response().putHeader("Content-Type", "application/json; charset=utf-8").end("fail 4");
-							}
+							rctx.response()
+								.putHeader("Content-Type", "application/json; charset=utf-8")
+								.end(encodeToJson(new QueryResult(pageTitlesInDb)));
 						}
 						else
 						{
 							log.error("dataset handler failed: {}", asyncDataSetHandler.cause());
-							rctx.response().end("failed 3");
+							rctx.response().end(encodeToJson(QueryResult.withError("DX", asyncDataSetHandler.cause().getMessage())));
 						}
 					});
 				}
 				catch (Exception e)
 				{
 					log.error("caught exception while querying database: {}", e.getCause());
-					rctx.response().end("failed 2");
+					rctx.response().end(encodeToJson(QueryResult.withError("DX", asyncResult.cause().getMessage())));
 				}
 			}
 			else
 			{
 				log.error("failed to get sql connection in vertx async jdbcClient: {}", asyncResult.cause());
-				rctx.response().end("failed 1");
+				rctx.response().end(encodeToJson(QueryResult.withError("DX", asyncResult.cause().getMessage())));
 			}
 		});
 	}
@@ -83,7 +78,6 @@ public class WikiQueriesHandler
 			return;
 		}
 		final String endPoint = "en.wikipedia.org";
-		//https://en.wikipedia.org/api/rest_v1/page/html/Thread(OS)
 		webClient.request(HttpMethod.GET, 443, endPoint, "/api/rest_v1/page/html" + "/" + pageTitle)
 			.ssl(true)
 			.send(httpResponseAsyncResult -> {
@@ -91,17 +85,33 @@ public class WikiQueriesHandler
 				{
 					log.info("succeeded http response");
 					final HttpResponse<Buffer> respBuffer = httpResponseAsyncResult.result();
+					if (respBuffer.statusCode() != 200)
+					{
+						rctx.response().setStatusCode(respBuffer.statusCode()).end();
+					}
 					final String respBody = respBuffer.bodyAsString();
-					log.info("resp json: {}", respBody);
+					log.info("got successful response from wikipedia API");
 					rctx.response().putHeader("Content-Type", "text/html; charset=utf-8").end(respBody);
 				}
 				else
 				{
-					log.error("failed http response");
-					rctx.response().end("failed http 1: {}", httpResponseAsyncResult.cause().getMessage());
+					log.error("failed http communication with wikipedia API: {}", httpResponseAsyncResult.cause().getMessage());
+					rctx.response().setStatusCode(500).end();
 				}
 			});
 	}
 
-	private static final String QUERY_TITLE = "select page_title as pageTitle from TITLES t where  MATCH(t.page_title) AGAINST(?);";
+	private static String encodeToJson(Object encodable)
+	{
+		try
+		{
+			log.info("parsed json from: {}", encodable.getClass().getName());
+			return mapper.writeValueAsString(encodable);
+		}
+		catch (JsonProcessingException e)
+		{
+			log.error("json parsing error: {}", e.getCause());
+			return "{\"JX\": \"Error encoding to json for " + encodable.getClass().getName() + "\"}";
+		}
+	}
 }
