@@ -8,7 +8,6 @@ import io.vertx.core.http.HttpMethod;
 import io.vertx.core.json.JsonArray;
 import io.vertx.ext.jdbc.JDBCClient;
 import io.vertx.ext.sql.ResultSet;
-import io.vertx.ext.sql.SQLConnection;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.client.HttpResponse;
 import io.vertx.ext.web.client.WebClient;
@@ -29,42 +28,23 @@ public class WikiQueriesHandler
 	public void handleQuery(RoutingContext rctx, JDBCClient jdbcClient)
 	{
 		final String titleName = rctx.request().getParam("name");
-		jdbcClient.getConnection(asyncResult -> {
-			if (asyncResult.succeeded())
+
+		jdbcClient.queryWithParams(QUERY_TITLE, new JsonArray().add("%" + titleName + "%"), asyncDataSetHandler -> {
+			if (asyncDataSetHandler.succeeded())
 			{
-				log.info("acquired sql connection in vertx async jdbcClient");
-				try (SQLConnection sqlConnection = asyncResult.result())
-				{
-					log.info("querying database for wikipedia titles matching name: {}", titleName);
-					sqlConnection.queryWithParams(QUERY_TITLE, new JsonArray().add("%" + titleName + "%"), asyncDataSetHandler -> {
-						if (asyncDataSetHandler.succeeded())
-						{
-							final ResultSet resultSet = asyncDataSetHandler.result();
-							final List<String> pageTitlesInDb = resultSet.getRows()
-								.stream()
-								.map(entries -> entries.getString("pageTitle")).collect(Collectors.toList());
-							log.info("found {} titles in database matching name {}", Unbox.box(pageTitlesInDb.size()), titleName);
-							rctx.response()
-								.putHeader("Content-Type", "application/json; charset=utf-8")
-								.end(encodeToJson(new QueryResult(pageTitlesInDb)));
-						}
-						else
-						{
-							log.error("dataset handler failed: {}", asyncDataSetHandler.cause());
-							rctx.response().end(encodeToJson(QueryResult.withError("DX", asyncDataSetHandler.cause().getMessage())));
-						}
-					});
-				}
-				catch (Exception e)
-				{
-					log.error("caught exception while querying database: {}", e.getCause());
-					rctx.response().end(encodeToJson(QueryResult.withError("DX", asyncResult.cause().getMessage())));
-				}
+				final ResultSet resultSet = asyncDataSetHandler.result();
+				final List<String> pageTitlesInDb = resultSet.getRows()
+					.stream()
+					.map(entries -> entries.getString("pageTitle")).collect(Collectors.toList());
+				log.info("found {} titles in database matching name {}", Unbox.box(pageTitlesInDb.size()), titleName);
+				rctx.response()
+					.putHeader("Content-Type", "application/json; charset=utf-8")
+					.end(encodeToJson(new QueryResult(pageTitlesInDb)));
 			}
 			else
 			{
-				log.error("failed to get sql connection in vertx async jdbcClient: {}", asyncResult.cause());
-				rctx.response().end(encodeToJson(QueryResult.withError("DX", asyncResult.cause().getMessage())));
+				log.error("dataset handler failed: {}", asyncDataSetHandler.cause());
+				rctx.response().end(encodeToJson(QueryResult.withError("DX", asyncDataSetHandler.cause().getMessage())));
 			}
 		});
 	}

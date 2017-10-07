@@ -22,7 +22,11 @@ can send messages to other verticles. How cool is that!.
 
 ### How Vertx works
 
-Under the hood, 
+Under the hood, Vertx APIs' are event-driven. That's how it comes as a reactive platform. Programmer-defined
+handlers are called using an "Event Loop" thread. That's how an event loop takes care of various events and is able to 
+deliver great performance. This might come as something counter-intuitive that a single thread can be more efficient than multiple threads. 
+You may also read about the famous LMAX disruptor platform which leverages the same underlying technique of running a non-blocking 
+single thread and deliver remarkable results.
 
 ### Fully async flow
 
@@ -70,7 +74,37 @@ what's the query and what to do with the result.
 #### Async HTTP client
 
 Consuming remote REST resources is one of the most common tasks we do as developers which is a classic example of blocking I/O
-operation.  
+operation. Vertx gives us an async http client to consume REST services in a style consistent to other modules (like we just 
+saw in async sql) without worrying about the underlying thread management. Let's take a look at the `handleFetch` method of our
+`WikiQueriesHandler` class. We have to be careful when specifying the REST endpoint and resource. They go as separate identifiers
+along with the port number. It is unlike some other common http clients. We also have to specify the port number and also if we're 
+talking through a secure http connection. In order to consume the response body received back from this remote resource, we provide 
+an async handler as well. In this particular example we've allowed our client to follow redirection because if our query is correct,
+the actual result we receive from this Wikipedia API is an http 302 with the URL to the article. 
+
+#### Performing I/O in a Worker Thread
+
+So far we've seen how Vertx introduces us to a programming paradigm that's efficient and quite different from a typical imperative-style
+code. This reactive, message-passing style also relieves us of low-level thread management and scheduling yet utilize our modern
+multi-core hardware to it's potential. 
+But there are occasions when you may need to write some routines which depend on the result of another routine. Such a scenarios might
+drive us to the famous callback hell which destroys the readability and maintainability of our code. For those occasions, Vertx provides
+us blocking executor API. 
+Consider a scenario in which we expose a REST API which first queries a data store and then consumes a remote REST resource. Parting
+from the async style we've enjoyed so far, we can also implement this scenario like so (pseudocode):
+
+```java
+...
+router.get("/multiStoreResource").blockingHandler(this::queryMultiStore);
+...
+public void queryMultiStore(RoutingContext rctx)
+{
+	//can use conventional jdbc drivers and blocking http clients here
+}
+```
+ 
 
 ### More Guides
 
+To learn more about the core of Vertx, visit the official documentation at http://vertx.io/docs/vertx-core/java/.
+From within there, more detail documentation can be found for other Vertx modules. 

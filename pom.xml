@@ -9,7 +9,7 @@
 	<packaging>jar</packaging>
 
 	<properties>
-		<vertx.version>3.4.2</vertx.version>
+		<vertx.version>3.5.0-SNAPSHOT</vertx.version>
 		<mysql-client.version>5.1.42</mysql-client.version>
 		<log4j.version>2.8.1</log4j.version>
 		<hikaricp.version>2.7.1</hikaricp.version>
@@ -192,4 +192,12 @@
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
+
+	<repositories>
+		<repository>
+			<id>snapshot_repo</id>
+			<name>sonatype_snapshot_repo</name>
+			<url>https://oss.sonatype.org/content/repositories/snapshots</url>
+		</repository>
+	</repositories>
 </project>
