@@ -103,6 +103,13 @@ public void queryMultiStore(RoutingContext rctx)
 }
 ```
  
+### Closing Remarks
+
+So far we've seen how to build a completely asynchronous REST web services backed by asynchronous database query and asynchronous remote HTTP call
+as a client. Usually these are the components on which modern enterprise applications are built. This entire writeup also gives you a hint towards a much broader
+Reactive Paradigm for large-scale application development which is gaining attention lately. Vertx, as a fundamental reactive applications' toolkit with a great
+community support, gives you an ample opportunity to build such scalable applications on the JVM. 
+       
 
 ### More Guides
 
